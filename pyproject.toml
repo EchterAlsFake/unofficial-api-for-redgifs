@@ -1,0 +1,35 @@
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[project]
+name = "unofficial-api-for-redgifs"
+version = "1.0.0"
+description = "An asynchronous Python API wrapper for RedGIFs"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{name = "Johannes Habel", email = "EchterAlsFake@proton.me"}]
+dependencies = ["eaf-base-api>=4.2.6", "selectolax"]
+
+[project.scripts]
+redgifs_api = "redgifs_api.api:main"
+
+[project.urls]
+"Support me on Ko-Fi" = "https://ko-fi.com/EchterAlsFake"
+"Donate via PayPal" = "https://paypal.me/EchterAlsFake"
+
+[tool.uv.build-backend]
+module-name = "redgifs_api"
+module-root = ""
+source-include = ["docs/**", "MANIFEST.in"]
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio", "build"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["redgifs_api/tests"]
