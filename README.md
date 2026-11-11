@@ -2,9 +2,10 @@
 <p align="center"><em>An asynchronous Python API wrapper and scraper for redgifs.com</em></p>
 
 <div align="center">
-    <a href="https://pepy.tech/project/unofficial-api-for-redgids"><img src="https://static.pepy.tech/badge/unofficial-api-for-redgifs" alt="Downloads"></a> +
+    <a href="https://pepy.tech/project/redgifs_api"><img src="https://static.pepy.tech/badge/redgifs_api" alt="Downloads"></a> +
+    <a href="https://pepy.tech/project/unofficial-api-for-redgifs"><img src="https://static.pepy.tech/badge/unofficial-api-for-redgifs" alt="Downloads"></a>
     <a href="https://github.com/EchterAlsFake/unofficial-api-for-redgifs/workflows/"><img src="https://github.com/EchterAlsFake/unofficial-api-for-redgifs/workflows/CodeQL/badge.svg" alt="CodeQL Analysis"/></a>
-    <a href="https://echteralsfake.me/ci/unofficial-api-for-redgifs/badge.svg"><img src="https://echteralsfake.me/ci/unofficial-api-for-unofficial-api-for-redgifs/badge.svg" alt="Sync API Tests"/></a>
+    <a href="https://echteralsfake.me/ci/unofficial-api-for-redgifs/badge.svg"><img src="https://echteralsfake.me/ci/unofficial-api-for-redgifs/badge.svg" alt="Sync API Tests"/></a>
     </div>
 
 # Disclaimer
@@ -21,27 +22,20 @@
 
 | Category | Details |
 |---|---|
-| **Video Fetching** | Rich API metadata, independent HTML titles/page metadata, and deferred source/field loading |
-| **Video Downloading** | Direct MP4 downloads with `hd`, `sd`, `silent`, `best`, `half`, and `worst` where available |
-| **User & Creator Profiles** | Profile metadata, separate video/image tabs, uploader relationships and public collections |
-| **Collection Fetching** | Paginated public collections containing typed video and image objects |
-| **Video Search** | Query and tag search, trending/latest/top ordering, verified-only filtering and creator search |
-| **Images, Tags & Niches** | Image metadata/downloads, typed tag records, niche details and video streams |
+| **Video Fetching** | Fetch video objects with full metadata (title, description, views, publish date, ratings, author, and associated models) |
+| **Video Downloading** | HLS-based downloading with configurable quality (`best`, `half`, `worst`, or specific resolutions) |
+| **Channel & Pornstar Profiles** | Fetch channel/pornstar/model profiles, retrieve videos, and extract worked-with-models metadata |
+| **Playlist Fetching** | Fetch and iterate through playlists page-by-page with concurrency control |
+| **Video Search** | Search videos with advanced filters for sorting, upload date, duration, and quality |
+| **Account Support** | Connect user account via login cookies to retrieve personalized watch later, favorites, and recommended videos |
 | **Async-First** | Fully asynchronous (`async` / `await`) built on top of `asyncio` |
-| **Built-in Caching** | Shared response caching with configurable limits to reduce redundant network requests |
-| **CLI Support** | Single-video or URL-file downloads — run `redgifs_api -h` for options |
-| **Type Safety** | Typed, source-aware `BaseMedia` dataclasses and structured `ScrapeResult` streams |
+| **Built-in Caching** | Automatic response caching with configurable limits to reduce redundant network requests |
+| **CLI Support** | Command-line interface for quick downloads — run `redgifs_api -h` for options |
+| **Type Safety** | Comprehensive type hinting and `dataclass`-based models throughout |
 
-Accepted page hosts are `redgifs.com` and `www.redgifs.com`; media identity URLs from
-`media.redgifs.com` are also supported. No language or proxy variants are accepted.
-HLS URLs are exposed for inspection; downloads use `DownloadConfigRAW` because the current
-shared HLS downloader does not preserve RedGIFs' byte ranges. Private/account actions
-and gallery enumeration are not implemented.
-
-Live validation remains incomplete: the final run recorded **38 passed, 12 failed,
-0 skipped**, with all final failures caused by HTTP 429. Earlier runs also reproduced
-upstream pagination omissions for equal-timestamp uploads. See the
-[validation report](docs/validation.md) for evidence, quality measurements and limitations.
+`Video.author_name` provides the uploader display name directly from the video
+page, without fetching the uploader's channel or video statistics. Use
+`await video.get_author` when you need the actual profile object.
 
 #### Networking Features
 
@@ -49,13 +43,13 @@ The networking layer is provided by the [`eaf_base_api`](https://github.com/Echt
 
 | Feature | Description |
 |---|---|
-| **HTTP/1.1, HTTP/2, HTTP/3** | Configurable HTTP version (`v1`, `v2`, `v3` — defaults to HTTP/2) |
+| **HTTP/1.1, HTTP/2, HTTP/3** | Configurable HTTP version (`v1`, `v2`, `v3` — defaults to HTTP/3) |
 | **Browser Impersonation** | Built-in browser fingerprint impersonation via `curl_cffi` (defaults to Chrome) |
 | **Custom JA3 Fingerprint** | Override the TLS fingerprint with a custom JA3 string for advanced use cases |
 | **Proxy Support** | All proxy types supported (HTTP, HTTPS, SOCKS4, SOCKS5) |
 | **Proxy Authentication** | Username/password authentication for proxies |
 | **Bandwidth Limiting** | Set a maximum download speed in MB/s (e.g., `2.0`, `3.5`) |
-| **DNS over HTTPS** | Configure DNS resolution over HTTPS |
+| **DNS over HTTPS** | Route DNS queries over HTTPS for privacy and bypassing DNS-level blocks |
 | **SSL Verification** | Toggle SSL certificate verification on or off |
 | **Request Delay** | Configurable delay between requests to respect rate limits |
 | **Concurrency Control** | Tune video and page concurrency independently for optimal throughput |
@@ -63,29 +57,20 @@ The networking layer is provided by the [`eaf_base_api`](https://github.com/Echt
 ---
 
 # Supported Platforms
-This API has been live-tested on:
+This API has been tested and confirmed working on:
 
-- Linux with Python 3.15.2
-
-Python 3.12 or newer is required. Other platforms have not been verified.
+- Windows 11 (x64) 
+- macOS Sequoia (x86_64)
+- Linux (Arch) (x86_64)
+- Android 16 (aarch64)
 
 ---
 
 # Installation
 
-Install from the local checkout before publication:
-
 ```bash
-pip install .
+pip install unofficial-api-for-redgifs
 ```
-
-For development with the neighboring shared backend checkout:
-
-```bash
-pip install -e ../eaf_base_api -e .
-```
-
-The distribution is named `unofficial-api-for-redgifs`; publication is not asserted.
 
 ---
 
@@ -98,23 +83,21 @@ The distribution is named `unofficial-api-for-redgifs`; publication is not asser
 
 ```python
 import asyncio
-from redgifs_api import Client, DownloadConfigRAW
+from redgifs_api import Client, DownloadConfigHLS
 
 async def main():
-    # Initialize a Client and close its network resources when finished
-    async with Client() as client:
-        # Load API metadata and the HTML display title
-        video_object = await client.get_video(
-            "https://www.redgifs.com/watch/hotpinkacrobatickitfox",
-            load_html=True,
-        )
+    # Initialize a Client object
+    client = Client()
+    
+    # Fetch a video
+    video_object = await client.get_video("<insert_url_here>")
+    
+    # Information from Video objects
+    print(video_object.title)
 
-        # Information from Video objects
-        print(video_object.title)
-
-        # Download the video
-        config = DownloadConfigRAW(quality="best", path="./")
-        await video_object.download(config)
+    # Download the video
+    config = DownloadConfigHLS(quality="best", path="./") # More options in the documentation
+    await video_object.download(config)
 
 if __name__ == "__main__":
     asyncio.run(main())

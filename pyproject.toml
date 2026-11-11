@@ -17,13 +17,15 @@ dependencies = ["eaf-base-api>=4.2.6", "selectolax"]
 redgifs_api = "redgifs_api.api:main"
 
 [project.urls]
+Documentation = "https://docs.echteralsfake.me/redgifs"
+Repository = "https://github.com/EchterAlsFake/unofficial-api-for-redgifs"
 "Support me on Ko-Fi" = "https://ko-fi.com/EchterAlsFake"
 "Donate via PayPal" = "https://paypal.me/EchterAlsFake"
 
 [tool.uv.build-backend]
 module-name = "redgifs_api"
 module-root = ""
-source-include = ["docs/**", "MANIFEST.in"]
+source-include = ["README.md", "LICENSE", "MANIFEST.in"]
 
 [dependency-groups]
 dev = ["pytest", "pytest-asyncio", "build"]
