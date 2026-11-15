@@ -4,14 +4,14 @@ build-backend = "uv_build"
 
 [project]
 name = "unofficial-api-for-redgifs"
-version = "1.0.0"
+version = "1.1.0"
 description = "An asynchronous Python API wrapper for RedGIFs"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [{name = "Johannes Habel", email = "EchterAlsFake@proton.me"}]
-dependencies = ["eaf-base-api>=4.2.6", "selectolax"]
+dependencies = ["eaf-base-api>=4.3.0", "selectolax"]
 
 [project.scripts]
 redgifs_api = "redgifs_api.api:main"

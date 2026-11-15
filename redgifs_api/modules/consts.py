@@ -31,7 +31,8 @@ def identifier(value: str, kind: str = "watch") -> str:
             value = parts[1]
         else:
             raise ValueError(f"Unsupported RedGIFs {kind} URL")
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+    pattern = r"[A-Za-z0-9_.-]+" if kind == "users" else r"[A-Za-z0-9_-]+"
+    if value in {".", ".."} or not re.fullmatch(pattern, value):
         raise ValueError("Invalid RedGIFs identifier")
     return value.lower()
 

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from base_api import paginated_stream, PageInfo, validate_pagination
+from base_api.modules.pagination import linked_page
+
 import argparse
 import asyncio
 import json
@@ -222,21 +225,56 @@ class User(BaseMedia):
         return {**{k: data.get(v) for k, v in names.items()},
                 "creation_date": iso_date(data.get("creationtime")), "raw_metadata": dict(data)}
 
-    def videos(self, *, pages: int | Literal["all"] = 1, start_page: int = 1, count: int = 40,
-               sort: ProfileSort | str = ProfileSort.NEW, tags: list[str] | None = None,
-               iterator_config: IteratorConfig | None = None) -> ScrapeStream[Video]:
+    def videos(
+        self,
+        *,
+        pages: int | Literal["all"] = 1,
+        start_page: int = 1,
+        count: int = 40,
+        sort: ProfileSort | str = ProfileSort.NEW,
+        tags: list[str] | None = None,
+        iterator_config: IteratorConfig | None = None,
+    ) -> ScrapeStream[Video]:
+        validate_pagination(pages, start_page)
         sort = ProfileSort(sort)
-        return _listing(_api_for(self), f"v2/users/{self.username}/search", Video,
-                        {"count": count, "order": sort, "type": "g", "tags": ','.join(tags or [])},
-                        pages, start_page, iterator_config)
+        return _listing(
+            _api_for(self),
+            f"v2/users/{self.username}/search",
+            Video,
+            {"count": count, "order": sort, "type": "g", "tags": ",".join(tags or [])},
+            pages,
+            start_page,
+            iterator_config,
+        )
 
-    def images(self, *, pages=1, start_page=1, count=40, iterator_config=None) -> ScrapeStream[Image]:
-        return _listing(_api_for(self), f"v2/users/{self.username}/search", Image,
-                        {"count": count, "order": "new", "type": "i"}, pages, start_page, iterator_config)
+    def images(
+        self, *, pages=1, start_page=1, count=40, iterator_config=None
+    ) -> ScrapeStream[Image]:
+        validate_pagination(pages, start_page)
+        return _listing(
+            _api_for(self),
+            f"v2/users/{self.username}/search",
+            Image,
+            {"count": count, "order": "new", "type": "i"},
+            pages,
+            start_page,
+            iterator_config,
+        )
 
-    def collections(self, *, pages=1, start_page=1, count=40, iterator_config=None) -> ScrapeStream[Collection]:
-        return _listing(_api_for(self), f"v2/users/{self.username}/collections", Collection,
-                        {"count": count}, pages, start_page, iterator_config, key="collections")
+    def collections(
+        self, *, pages=1, start_page=1, count=40, iterator_config=None
+    ) -> ScrapeStream[Collection]:
+        validate_pagination(pages, start_page)
+        return _listing(
+            _api_for(self),
+            f"v2/users/{self.username}/collections",
+            Collection,
+            {"count": count},
+            pages,
+            start_page,
+            iterator_config,
+            key="collections",
+        )
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
@@ -271,10 +309,20 @@ class Niche(BaseMedia):
                  "tags": "tags", "preferences": "preferences"}
         return {**{k: data.get(v) for k, v in names.items()}, "raw_metadata": dict(data)}
 
-    def videos(self, *, pages=1, start_page=1, count=40, sort="new", iterator_config=None):
+    def videos(
+        self, *, pages=1, start_page=1, count=40, sort="new", iterator_config=None
+    ):
+        validate_pagination(pages, start_page)
         sort = ProfileSort(sort)
-        return _listing(_api_for(self), f"v2/niches/{self.niche_id}/gifs", Video,
-                        {"count": count, "order": sort, "type": "g"}, pages, start_page, iterator_config)
+        return _listing(
+            _api_for(self),
+            f"v2/niches/{self.niche_id}/gifs",
+            Video,
+            {"count": count, "order": sort, "type": "g"},
+            pages,
+            start_page,
+            iterator_config,
+        )
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
@@ -305,8 +353,17 @@ class Collection(BaseMedia):
                 "raw_metadata": dict(data)}
 
     def items(self, *, pages=1, start_page=1, count=40, iterator_config=None):
-        return _listing(_api_for(self), f"v2/users/{self.username}/collections/{self.collection_id}/gifs",
-                        Video, {"count": count}, pages, start_page, iterator_config, mixed=True)
+        validate_pagination(pages, start_page)
+        return _listing(
+            _api_for(self),
+            f"v2/users/{self.username}/collections/{self.collection_id}/gifs",
+            Video,
+            {"count": count},
+            pages,
+            start_page,
+            iterator_config,
+            mixed=True,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,38 +390,73 @@ def _extract_items(content, *, kind, key, mixed):
                    "username": item['userId'], "collection_id": item['folderId'], "_seed": item}
 
 
-def _listing(api, path, kind, params, pages, start_page, iterator_config, *, key="gifs", mixed=False):
+def _listing(
+    api,
+    path,
+    kind,
+    params,
+    pages,
+    start_page,
+    iterator_config,
+    *,
+    key="gifs",
+    mixed=False,
+):
+    validate_pagination(pages, start_page)
     params = {key: value for key, value in params.items() if value not in (None, "")}
-    if isinstance(pages, bool) or (pages != "all" and (not isinstance(pages, int) or pages < 1)):
-        raise ValueError("pages must be a positive integer or 'all'")
-    if isinstance(start_page, bool) or not isinstance(start_page, int) or start_page < 1:
-        raise ValueError("start_page must be a positive integer")
-    if isinstance(params.get("count"), bool) or not isinstance(params.get("count"), int) or not 1 <= params['count'] <= 100:
+    if (
+        isinstance(params.get("count"), bool)
+        or not isinstance(params.get("count"), int)
+        or not 1 <= params["count"] <= 100
+    ):
         raise ValueError("count must be between 1 and 100")
-    config = iterator_config or make_iterator_config(("api",), page_error_mode=ErrorMode.RAISE,
-                                                     item_error_mode=ErrorMode.RAISE)
+
     def construct(*, core, **data):
-        actual = Image if mixed and data['_seed']['type'] == 2 else kind
+        actual = Image if mixed and data["_seed"]["type"] == 2 else kind
         return actual(core=api.core, _api=api, **data)
-    helper = Helper(core=api, constructor=construct)
-    extractor = partial(_extract_items, kind=kind, key=key, mixed=mixed)
-    def page_url(page):
-        return f"{API_URL}/{path}?{urlencode({**params, 'page': page})}"
+
+    page_url = lambda page: f"{API_URL}/{path}?{urlencode({**params, 'page': page})}"
+
+    # Validate existence and bound the range using page one: collections return
+    # 404 for a valid beyond-last request as well as for a missing collection.
     async def generate():
-        # Discover the server's actual last page; no guess based on result length.
-        # Collections return HTTP 404 beyond the final page. Discover from page 1
-        # so an invalid collection still raises, while a valid exhausted list ends.
-        first = json.loads(await api.fetch_text(page_url(1)))
-        last = first.get('pages')
-        if not isinstance(last, int) or last < 0 or first.get('page') != 1:
+        first = await api.get(path + "?" + urlencode({**params, "page": 1}))
+        last = first.get("pages")
+        if (
+            isinstance(last, bool)
+            or not isinstance(last, int)
+            or last < 0
+            or first.get("page") != 1
+        ):
             raise ValueError("Invalid RedGIFs pagination metadata")
-        end = last if pages == "all" else min(last, start_page + pages - 1)
-        if start_page > end:
+        if start_page > last:
             return
-        urls = [page_url(page) for page in range(start_page, end + 1)]
-        async with helper.iterator(urls, extractor, iterator_config=config) as stream:
+
+        def info(content, page, rows):
+            data = json.loads(content)
+            return PageInfo(
+                current_page=data["page"], total_pages=data["pages"], terminal=not rows
+            )
+
+        stream = paginated_stream(
+            core=api,
+            constructor=construct,
+            page_url=page_url,
+            item_extractor=partial(_extract_items, kind=kind, key=key, mixed=mixed),
+            page_info=info,
+            pages=pages,
+            start_page=start_page,
+            iterator_config=iterator_config
+            or make_iterator_config(
+                ("api",),
+                page_error_mode=ErrorMode.RAISE,
+                item_error_mode=ErrorMode.RAISE,
+            ),
+        )
+        async with stream:
             async for result in stream:
                 yield result
+
     return ScrapeStream(generate())
 
 
@@ -415,26 +507,97 @@ class Client:
             await result.load_sources("api")
         return result
 
-    def search(self, query: str = "", *, tags: list[str] | None = None, sort: Sort | str = Sort.TRENDING,
-               pages=1, start_page=1, count=40, verified=False, iterator_config=None):
-        return _listing(self._api, "v2/gifs/search", Video,
-                        {"query": query, "tags": ','.join(tags or []), "order": Sort(sort),
-                         "count": count, "type": "g", "verified": "y" if verified else ""},
-                        pages, start_page, iterator_config)
+    def search(
+        self,
+        query: str = "",
+        *,
+        tags: list[str] | None = None,
+        sort: Sort | str = Sort.TRENDING,
+        pages=1,
+        start_page=1,
+        count=40,
+        verified=False,
+        iterator_config=None,
+    ):
+        validate_pagination(pages, start_page)
+        return _listing(
+            self._api,
+            "v2/gifs/search",
+            Video,
+            {
+                "query": query,
+                "tags": ",".join(tags or []),
+                "order": Sort(sort),
+                "count": count,
+                "type": "g",
+                "verified": "y" if verified else "",
+            },
+            pages,
+            start_page,
+            iterator_config,
+        )
 
-    def search_images(self, query="", *, tags=None, pages=1, start_page=1, count=40, iterator_config=None):
-        return _listing(self._api, "v2/gifs/search", Image,
-                        {"query": query, "tags": ','.join(tags or []), "order": "latest", "count": count, "type": "i"},
-                        pages, start_page, iterator_config)
+    def search_images(
+        self,
+        query="",
+        *,
+        tags=None,
+        pages=1,
+        start_page=1,
+        count=40,
+        iterator_config=None,
+    ):
+        validate_pagination(pages, start_page)
+        return _listing(
+            self._api,
+            "v2/gifs/search",
+            Image,
+            {
+                "query": query,
+                "tags": ",".join(tags or []),
+                "order": "latest",
+                "count": count,
+                "type": "i",
+            },
+            pages,
+            start_page,
+            iterator_config,
+        )
 
-    def search_users(self, query="", *, pages=1, start_page=1, count=40, verified=False, iterator_config=None):
-        return _listing(self._api, "v2/creators/search", User,
-                        {"query": query, "count": count, "verified": "y" if verified else ""},
-                        pages, start_page, iterator_config, key="items")
+    def search_users(
+        self,
+        query="",
+        *,
+        pages=1,
+        start_page=1,
+        count=40,
+        verified=False,
+        iterator_config=None,
+    ):
+        validate_pagination(pages, start_page)
+        return _listing(
+            self._api,
+            "v2/creators/search",
+            User,
+            {"query": query, "count": count, "verified": "y" if verified else ""},
+            pages,
+            start_page,
+            iterator_config,
+            key="items",
+        )
 
     def get_niches(self, *, pages=1, start_page=1, count=40, iterator_config=None):
-        return _listing(self._api, "v2/niches/search", Niche, {"count": count},
-                        pages, start_page, iterator_config, key="niches")
+        validate_pagination(pages, start_page)
+        return _listing(
+            self._api,
+            "v2/niches/search",
+            Niche,
+            {"count": count},
+            pages,
+            start_page,
+            iterator_config,
+            key="niches",
+        )
 
     async def get_tags(self, *, trending: bool = False) -> list[Tag]:
         data = await self._api.get("v2/tags/trending" if trending else "v1/tags")
